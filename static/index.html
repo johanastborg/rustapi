@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>arXiv Paper Storage | Rust Axum REST API</title>
+  <meta name="description" content="High-performance arXiv paper storage REST API built with Rust, Axum, and in-memory mock storage. Includes an interactive explorer and live dashboard." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <!-- Background Glow Accents -->
+  <div class="glow-bg glow-1"></div>
+  <div class="glow-bg glow-2"></div>
+
+  <!-- Navigation Bar -->
+  <header class="navbar" id="main-nav">
+    <div class="nav-container">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            <line x1="9" y1="7" x2="15" y2="7"></line>
+            <line x1="9" y1="11" x2="13" y2="11"></line>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">arXiv<span class="gradient-text">Vault</span></span>
+          <span class="brand-badge">Axum 0.8 • In-Memory</span>
+        </div>
+      </div>
+
+      <div class="nav-center">
+        <button id="nav-tab-papers" class="tab-btn active" onclick="switchTab('papers')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          Papers Archive
+        </button>
+        <button id="nav-tab-api" class="tab-btn" onclick="switchTab('api')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          API Playground
+        </button>
+      </div>
+
+      <div class="nav-actions">
+        <div class="server-status" id="server-status-pill">
+          <span class="status-dot"></span>
+          <span id="server-status-text">Connecting...</span>
+        </div>
+        <button id="btn-open-create-modal" class="btn btn-primary" onclick="openCreateModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Add Paper
+        </button>
+        <button id="btn-reset-storage" class="btn btn-ghost" title="Reset mock data to default seeds" onclick="confirmResetStore()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-content" id="main-content">
+    
+    <!-- Tab 1: Papers View -->
+    <section id="view-papers" class="tab-content active">
+      <!-- Hero & Stats Header -->
+      <div class="hero-section">
+        <div class="hero-content">
+          <h1 class="hero-title">High-Performance <span class="gradient-text">arXiv Paper</span> Storage</h1>
+          <p class="hero-subtitle">
+            A concurrent, thread-safe in-memory paper repository powered by Axum, Tokio, and Rust. Search, filter, and manage academic preprints with microsecond response times.
+          </p>
+        </div>
+
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card" id="stat-card-total">
+            <div class="stat-header">
+              <span class="stat-label">Total Papers</span>
+              <span class="stat-icon">📄</span>
+            </div>
+            <div class="stat-value" id="stat-total-papers">-</div>
+            <div class="stat-sub">Pre-loaded in RAM</div>
+          </div>
+          <div class="stat-card" id="stat-card-authors">
+            <div class="stat-header">
+              <span class="stat-label">Unique Authors</span>
+              <span class="stat-icon">👥</span>
+            </div>
+            <div class="stat-value" id="stat-total-authors">-</div>
+            <div class="stat-sub">Indexed researchers</div>
+          </div>
+          <div class="stat-card" id="stat-card-categories">
+            <div class="stat-header">
+              <span class="stat-label">Categories</span>
+              <span class="stat-icon">🏷️</span>
+            </div>
+            <div class="stat-value" id="stat-total-categories">-</div>
+            <div class="stat-sub">arXiv taxonomy fields</div>
+          </div>
+          <div class="stat-card" id="stat-card-runtime">
+            <div class="stat-header">
+              <span class="stat-label">Backend Engine</span>
+              <span class="stat-icon">⚡</span>
+            </div>
+            <div class="stat-value" style="font-size: 1.35rem; color: #a5b4fc;">Axum 0.8</div>
+            <div class="stat-sub">Tokio Async Runtime</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls & Filter Toolbar -->
+      <div class="controls-card">
+        <div class="search-row">
+          <div class="search-box">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="paper-search-input" placeholder="Search by paper title, author, arXiv ID, abstract keyword..." autocomplete="off" />
+            <button id="clear-search-btn" class="btn-clear" onclick="clearSearch()" style="display: none;">✕</button>
+          </div>
+
+          <div class="filter-actions">
+            <div class="select-wrapper">
+              <select id="sort-select" onchange="handleSortChange(this.value)">
+                <option value="newest">Sort: Newest First</option>
+                <option value="oldest">Sort: Oldest First</option>
+                <option value="title">Sort: Title A-Z</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category Pills -->
+        <div class="categories-bar" id="categories-bar">
+          <button class="cat-pill active" data-category="" onclick="filterCategory('')">All Fields</button>
+          <button class="cat-pill" data-category="cs.CL" onclick="filterCategory('cs.CL')">cs.CL (Computation & Language)</button>
+          <button class="cat-pill" data-category="cs.AI" onclick="filterCategory('cs.AI')">cs.AI (Artificial Intelligence)</button>
+          <button class="cat-pill" data-category="cs.LG" onclick="filterCategory('cs.LG')">cs.LG (Machine Learning)</button>
+          <button class="cat-pill" data-category="cs.CV" onclick="filterCategory('cs.CV')">cs.CV (Computer Vision)</button>
+        </div>
+      </div>
+
+      <!-- Paper Results Header -->
+      <div class="results-header">
+        <div class="results-count" id="results-count-text">Loading stored papers...</div>
+        <div class="pagination-controls" id="pagination-controls">
+          <!-- Dynamically rendered -->
+        </div>
+      </div>
+
+      <!-- Papers Grid -->
+      <div class="papers-grid" id="papers-grid">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- Tab 2: REST API Playground & Docs -->
+    <section id="view-api" class="tab-content" style="display: none;">
+      <div class="api-hero">
+        <h2 class="section-title">REST API <span class="gradient-text">Interactive Playground</span></h2>
+        <p class="section-desc">
+          Test the live Axum endpoints directly from your browser. Observe real HTTP status codes, response headers, and JSON payloads.
+        </p>
+      </div>
+
+      <div class="api-playground-layout">
+        <!-- Endpoint List Sidebar -->
+        <div class="api-endpoints-sidebar" id="api-endpoints-list">
+          <div class="api-endpoint-item active" onclick="selectEndpoint('get_papers')">
+            <span class="http-badge get">GET</span>
+            <span class="endpoint-path">/api/papers</span>
+          </div>
+          <div class="api-endpoint-item" onclick="selectEndpoint('get_paper_id')">
+            <span class="http-badge get">GET</span>
+            <span class="endpoint-path">/api/papers/{id}</span>
+          </div>
+          <div class="api-endpoint-item" onclick="selectEndpoint('post_paper')">
+            <span class="http-badge post">POST</span>
+            <span class="endpoint-path">/api/papers</span>
+          </div>
+          <div class="api-endpoint-item" onclick="selectEndpoint('put_paper')">
+            <span class="http-badge put">PUT</span>
+            <span class="endpoint-path">/api/papers/{id}</span>
+          </div>
+          <div class="api-endpoint-item" onclick="selectEndpoint('delete_paper')">
+            <span class="http-badge delete">DELETE</span>
+            <span class="endpoint-path">/api/papers/{id}</span>
+          </div>
+          <div class="api-endpoint-item" onclick="selectEndpoint('get_stats')">
+            <span class="http-badge get">GET</span>
+            <span class="endpoint-path">/api/stats</span>
+          </div>
+          <div class="api-endpoint-item" onclick="selectEndpoint('get_health')">
+            <span class="http-badge get">GET</span>
+            <span class="endpoint-path">/health</span>
+          </div>
+          <div class="api-endpoint-item" onclick="selectEndpoint('post_reset')">
+            <span class="http-badge post">POST</span>
+            <span class="endpoint-path">/api/papers/reset</span>
+          </div>
+        </div>
+
+        <!-- Endpoint Execution Console -->
+        <div class="api-console">
+          <div class="console-header">
+            <div class="console-url-bar">
+              <span id="console-method" class="http-badge get">GET</span>
+              <input type="text" id="console-url-input" value="/api/papers" class="console-input" />
+              <button id="btn-send-request" class="btn btn-primary" onclick="executeApiRequest()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Send Request
+              </button>
+            </div>
+          </div>
+
+          <!-- Body / Params Editor (if POST/PUT) -->
+          <div id="console-body-wrapper" class="console-body-wrapper" style="display: none;">
+            <div class="body-label">JSON Request Payload:</div>
+            <textarea id="console-json-payload" class="code-editor" rows="7"></textarea>
+          </div>
+
+          <!-- Curl Command Box -->
+          <div class="curl-box">
+            <div class="curl-header">
+              <span>cURL equivalent:</span>
+              <button class="btn-copy" onclick="copyCurl()">Copy cURL</button>
+            </div>
+            <code id="curl-code-snippet">curl http://localhost:3000/api/papers</code>
+          </div>
+
+          <!-- Response Pane -->
+          <div class="response-pane">
+            <div class="response-header">
+              <span>Response:</span>
+              <div class="response-meta" id="response-meta">
+                <span id="response-status-badge" class="badge-status">Status: Ready</span>
+                <span id="response-time-badge" class="badge-time">0 ms</span>
+              </div>
+            </div>
+            <pre class="response-output"><code id="response-json-output">// Click "Send Request" to test this endpoint</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: Create Paper -->
+  <div class="modal-backdrop" id="create-modal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Deposit New Paper</h3>
+        <button class="modal-close-btn" onclick="closeCreateModal()">✕</button>
+      </div>
+      <form id="create-paper-form" onsubmit="handleCreatePaper(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="create-id">arXiv Identifier (Optional, e.g., 2404.12345)</label>
+            <input type="text" id="create-id" placeholder="Leave empty for auto-generated ID" />
+          </div>
+
+          <div class="form-group full-width">
+            <label for="create-title">Paper Title *</label>
+            <input type="text" id="create-title" required placeholder="e.g. Scalable Diffusion Models with Transformers" />
+          </div>
+
+          <div class="form-group full-width">
+            <label for="create-authors">Authors * (Comma separated)</label>
+            <input type="text" id="create-authors" required placeholder="William Peebles, Saining Xie" />
+          </div>
+
+          <div class="form-group">
+            <label for="create-primary-cat">Primary Category *</label>
+            <select id="create-primary-cat" required>
+              <option value="cs.AI">cs.AI (Artificial Intelligence)</option>
+              <option value="cs.CL">cs.CL (Computation and Language)</option>
+              <option value="cs.CV">cs.CV (Computer Vision)</option>
+              <option value="cs.LG" selected>cs.LG (Machine Learning)</option>
+              <option value="cs.NE">cs.NE (Neural & Evolutionary Computing)</option>
+              <option value="stat.ML">stat.ML (Machine Learning - Stat)</option>
+              <option value="quant-ph">quant-ph (Quantum Physics)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="create-categories">Additional Categories (Comma separated)</label>
+            <input type="text" id="create-categories" placeholder="cs.CV, cs.AI" />
+          </div>
+
+          <div class="form-group full-width">
+            <label for="create-summary">Abstract / Summary *</label>
+            <textarea id="create-summary" rows="4" required placeholder="Summarize the core methodology, findings, and contributions..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="create-comment">Comments / Conference</label>
+            <input type="text" id="create-comment" placeholder="e.g., 12 pages, ICCV 2023" />
+          </div>
+
+          <div class="form-group">
+            <label for="create-doi">DOI (Optional)</label>
+            <input type="text" id="create-doi" placeholder="10.1109/..." />
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="closeCreateModal()">Cancel</button>
+          <button type="submit" id="btn-submit-paper" class="btn btn-primary">Save to Repository</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Paper -->
+  <div class="modal-backdrop" id="edit-modal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Paper <span id="edit-paper-id-display" class="id-tag"></span></h3>
+        <button class="modal-close-btn" onclick="closeEditModal()">✕</button>
+      </div>
+      <form id="edit-paper-form" onsubmit="handleUpdatePaper(event)">
+        <input type="hidden" id="edit-id" />
+        <div class="form-grid">
+          <div class="form-group full-width">
+            <label for="edit-title">Paper Title *</label>
+            <input type="text" id="edit-title" required />
+          </div>
+
+          <div class="form-group full-width">
+            <label for="edit-authors">Authors * (Comma separated)</label>
+            <input type="text" id="edit-authors" required />
+          </div>
+
+          <div class="form-group">
+            <label for="edit-primary-cat">Primary Category</label>
+            <select id="edit-primary-cat">
+              <option value="cs.AI">cs.AI</option>
+              <option value="cs.CL">cs.CL</option>
+              <option value="cs.CV">cs.CV</option>
+              <option value="cs.LG">cs.LG</option>
+              <option value="quant-ph">quant-ph</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-categories">Categories (Comma separated)</label>
+            <input type="text" id="edit-categories" />
+          </div>
+
+          <div class="form-group full-width">
+            <label for="edit-summary">Abstract / Summary *</label>
+            <textarea id="edit-summary" rows="4" required></textarea>
+          </div>
+
+          <div class="form-group full-width">
+            <label for="edit-comment">Comments / Journal Ref</label>
+            <input type="text" id="edit-comment" />
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="closeEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Paper</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
